@@ -1,7 +1,7 @@
-Info file internals, produced by Makeinfo, -*- Text -*- from input
-file internals.texinfo.
+Info file gcc.info, produced by Makeinfo, -*- Text -*- from input
+file gcc.texinfo.
 
-This file documents the internals of the GNU compiler.
+This file documents the use and the internals of the GNU compiler.
 
 Copyright (C) 1988 Free Software Foundation, Inc.
 
@@ -25,492 +25,7 @@ English.
 
 
 
-File: internals,  Node: Registers,  Next: Register Classes,  Prev: Storage Layout,  Up: Machine Macros
-
-Register Usage
-==============
-
-`FIRST_PSEUDO_REGISTER'
-     Number of hardware registers known to the compiler.  They
-     receive numbers 0 through `FIRST_PSEUDO_REGISTER-1'; thus, the
-     first pseudo register's number really is assigned the number
-     `FIRST_PSEUDO_REGISTER'.
-
-`FIXED_REGISTERS'
-     An initializer that says which registers are used for fixed
-     purposes all throughout the compiled code and are therefore not
-     available for general allocation.  These would include the stack
-     pointer, the frame pointer (except on machines where that can be
-     used as a general register when no frame pointer is needed), the
-     program counter on machines where that is considered one of the
-     addressable registers, and any other numbered register with a
-     standard use.
-
-     This information is expressed as a sequence of numbers,
-     separated by commas and surrounded by braces.  The Nth number is
-     1 if register N is fixed, 0 otherwise.
-
-     The table initialized from this macro, and the table initialized
-     by the following one, may be overridden at run time either
-     automatically, by the actions of the macro
-     `CONDITIONAL_REGISTER_USAGE', or by the user with the command
-     options `-ffixed-REG', `-fcall-used-REG' and `-fcall-saved-REG'.
-
-`CALL_USED_REGISTERS'
-     Like `FIXED_REGISTERS' but has 1 for each register that is
-     clobbered (in general) by function calls as well as for fixed
-     registers.  This macro therefore identifies the registers that
-     are not available for general allocation of values that must
-     live across function calls.
-
-     If a register has 0 in `CALL_USED_REGISTERS', the compiler
-     automatically saves it on function entry and restores it on
-     function exit, if the register is used within the function.
-
-`CONDITIONAL_REGISTER_USAGE'
-     Zero or more C statements that may conditionally modify two
-     variables `fixed_regs' and `call_used_regs' (both of type `char
-     []') after they have been initialized from the two preceding
-     macros.
-
-     This is necessary in case the fixed or call-clobbered registers
-     depend on target flags.
-
-     You need not define this macro if it has no work to do.
-
-     If the usage of an entire class of registers depends on the
-     target flags, you may indicate this to gcc by using this macro
-     to modify `fixed_regs' and `call_used_regs' to 1 for each of the
-     registers in the classes which should not be used by gcc.  Also
-     define the macro `REG_CLASS_FROM_LETTER' to return `NO_REGS' if
-     it is called with a letter for a class that shouldn't be used.
-
-     (However, if this class is not included in `GENERAL_REGS' and
-     all of the insn patterns whose constraints permit this class are
-     controlled by target switches, then GCC will automatically avoid
-     using these registers when the target switches are opposed to
-     them.)
-
-`OVERLAPPING_REGNO_P (REGNO)'
-     If defined, this is a C expression whose value is REGNO is
-     nonzero if hard register number REGNO is an overlapping
-     register.  This means a hard register which overlaps a hard
-     register with a different number.  (Such overlap is undesirable,
-     but occasionally it allows a machine to be supported which
-     otherwise could not be.)  This macro must return nonzero for
-     *all* the registers which overlap each other.  GNU CC can use an
-     overlapping register only in certain limited ways.  It can be
-     used for allocation within a basic block, and may be spilled for
-     reloading; that is all.
-
-     If this macro is not defined, it means that none of the hard
-     registers overlap each other.  This is the usual situation.
-
-`INSN_CLOBBERS_REGNO_P (INSN, REGNO)'
-     If defined, this is a C expression whose value should be nonzero
-     if the insn INSN has the effect of mysteriously clobbering the
-     contents of hard register number REGNO.  By ``mysterious'' we
-     mean that the insn's RTL expression doesn't describe such an
-     effect.
-
-     If this macro is not defined, it means that no insn clobbers
-     registers mysteriously.  This is the usual situation; all else
-     being equal, it is best for the RTL expression to show all the
-     activity.
-
-`PRESERVE_DEATH_INFO_REGNO_P (REGNO)'
-     If defined, this is a C expression whose value is nonzero if
-     accurate `REG_DEAD' notes are needed for hard register number
-     REGNO at the time of outputting the assembler code.  When this
-     is so, a few optimizations that take place after register
-     allocation and could invalidate the death notes are not done
-     when this register is involved.
-
-     You would arrange to preserve death info for a register when
-     some of the code in the machine description which is executed to
-     write the assembler code looks at the the death notes.  This is
-     necessary only when the actual hardware feature which GNU CC
-     thinks of as a register is not actually a register of the usual
-     sort.  (It might, for example, be a hardware stack.)
-
-     If this macro is not defined, it means that no death notes need
-     to be preserved.  This is the usual situation.
-
-`HARD_REGNO_REGS (REGNO, MODE)'
-     A C expression for the number of consecutive hard registers,
-     starting at register number REGNO, required to hold a value of
-     mode MODE.
-
-     On a machine where all registers are exactly one word, a
-     suitable definition of this macro is
-
-          #define HARD_REGNO_NREGS(REGNO, MODE)            \
-             ((GET_MODE_SIZE (MODE) + UNITS_PER_WORD - 1)  \
-              / UNITS_PER_WORD))
-
-`HARD_REGNO_MODE_OK (REGNO, MODE)'
-     A C expression that is nonzero if it is permissible to store a
-     value of mode MODE in hard register number REGNO (or in several
-     registers starting with that one).  For a machine where all
-     registers are equivalent, a suitable definition is
-
-          #define HARD_REGNO_MODE_OK(REGNO, MODE) 1
-
-     It is not necessary for this macro to check for fixed register
-     numbers because the allocation mechanism considers them to be
-     always occupied.
-
-     Many machines have special registers for floating point
-     arithmetic.  Often people assume that floating point machine
-     modes are allowed only in floating point registers.  This is not
-     true.  Any registers that can hold integers can safely *hold* a
-     floating point machine mode, whether or not floating arithmetic
-     can be done on it in those registers.
-
-     The true significance of special floating registers is rather
-     than non-floating-point machine modes *may not* go in those
-     registers.  This is true if the floating registers normalize any
-     value stored in them, because storing a non-floating value there
-     would garble it.  If the floating registers do not automatically
-     normalize, if you can store any bit pattern in one and retrieve
-     it unchanged without a trap, then any machine mode may go in a
-     floating register and this macro should say so.
-
-     Sometimes there are floating registers that are especially slow
-     to access, so that it is better to store a value in a stack
-     frame than in such a register if floating point arithmetic is
-     not being done.  As long as the floating registers are not in
-     class `GENERAL_REGS', they will not be used unless some insn's
-     constraint asks for one.
-
-     It is obligatory to support floating point `move' instructions
-     into and out of general registers, because unions and structures
-     (which have modes `SImode' or `DImode') can be in those
-     registers and they may have floating point members.
-
-`MODES_TIEABLE_P (MODE1, MODE2)'
-     A C expression that is nonzero if it is desirable to choose
-     register allocation so as to avoid move instructions between a
-     value of mode MODE1 and a value of mode MODE2.
-
-     If `HARD_REGNO_MODE_OK (R, MODE1)' and `HARD_REGNO_MODE_OK (R,
-     MODE2)' are ever different for any R, then `MODES_TIEABLE_P
-     (MODE1, MODE2)' must be zero.
-
-`PC_REGNUM'
-     If the program counter has a register number, define this as
-     that register number.  Otherwise, do not define it.
-
-`STACK_POINTER_REGNUM'
-     The register number of the stack pointer register, which must
-     also be a fixed register according to `FIXED_REGISTERS'.  On
-     many machines, the hardware determines which register this is.
-
-`FRAME_POINTER_REGNUM'
-     The register number of the frame pointer register, which is used
-     to access automatic variables in the stack frame.  On some
-     machines, the hardware determines which register this is.  On
-     other machines, you can choose any register you wish for this
-     purpose.
-
-`FRAME_POINTER_REQUIRED'
-     A C expression which is nonzero if a function must have and use
-     a frame pointer.  This expression is evaluated in the reload
-     pass, in the function `reload', and it can in principle examine
-     the current function and decide according to the facts, but on
-     most machines the constant 0 or the constant 1 suffices.  Use 0
-     when the machine allows code to be generated with no frame
-     pointer, and doing so saves some time or space.  Use 1 when
-     there is no possible advantage to avoiding a frame pointer.
-
-     In certain cases, the compiler does not know how to do without a
-     frame pointer.  The compiler recognizes those cases and
-     automatically gives the function a frame pointer regardless of
-     what `FRAME_POINTER_REQUIRED' says.  You don't need to worry
-     about them.
-
-     In a function that does not require a frame pointer, the frame
-     pointer register can be allocated for ordinary usage, unless you
-     mark it as a fixed register.  See `FIXED_REGISTERS' for more
-     information.
-
-`ARG_POINTER_REGNUM'
-     The register number of the arg pointer register, which is used
-     to access the function's argument list.  On some machines, this
-     is the same as the frame pointer register.  On some machines,
-     the hardware determines which register this is.  On other
-     machines, you can choose any register you wish for this purpose.
-     If this is not the same register as the frame pointer register,
-     then you must mark it as a fixed register according to
-     `FIXED_REGISTERS'.
-
-`STATIC_CHAIN_REGNUM'
-     The register number used for passing a function's static chain
-     pointer.  This is needed for languages such as Pascal and Algol
-     where functions defined within other functions can access the
-     local variables of the outer functions; it is not currently used
-     because C does not provide this feature, but you must define the
-     macro.
-
-     The static chain register need not be a fixed register.
-
-`STRUCT_VALUE_REGNUM'
-     When a function's value's mode is `BLKmode', the value is not
-     returned according to `FUNCTION_VALUE'.  Instead, the caller
-     passes the address of a block of memory in which the value
-     should be stored.
-
-     If this value is passed in a register, then
-     `STRUCT_VALUE_REGNUM' should be the number of that register.
-
-`STRUCT_VALUE'
-     If the structure value address is not passed in a register,
-     define `STRUCT_VALUE' as an expression returning an RTX for the
-     place where the address is passed.  If it returns a `mem' RTX,
-     the address is passed as an ``invisible'' first argument.
-
-`STRUCT_VALUE_INCOMING_REGNUM'
-     On some architectures the place where the structure value
-     address is found by the called function is not the same place
-     that the caller put it.  This can be due to register windows, or
-     it could be because the function prologue moves it to a
-     different place.
-
-     If the incoming location of the structure value address is in a
-     register, define this macro as the register number.
-
-`STRUCT_VALUE_INCOMING'
-     If the incoming location is not a register, define
-     `STRUCT_VALUE_INCOMING' as an expression for an RTX for where
-     the called function should find the value.  If it should find
-     the value on the stack, define this to create a `mem' which
-     refers to the frame pointer.  If the value is a `mem', the
-     compiler assumes it is for an invisible first argument, and
-     leaves space for it when finding the first real argument.
-
-`REG_ALLOC_ORDER'
-     If defined, an initializer for a vector of integers, containing
-     the numbers of hard registers in the order in which the GNU CC
-     should prefer to use them (from most preferred to least).
-
-     If this macro is not defined, registers are used lowest numbered
-     first (all else being equal).
-
-     One use of this macro is on the 360, where the highest numbered
-     registers must always be saved and the save-multiple-registers
-     instruction supports only sequences of consecutive registers. 
-     This macro is defined to cause the highest numbered allocatable
-     registers to be used first.
-
-
-
-File: internals,  Node: Register Classes,  Next: Stack Layout,  Prev: Registers,  Up: Machine Macros
-
-Register Classes
-================
-
-On many machines, the numbered registers are not all equivalent.  For
-example, certain registers may not be allowed for indexed addressing;
-certain registers may not be allowed in some instructions.  These
-machine restrictions are described to the compiler using "register
-classes".
-
-You define a number of register classes, giving each one a name and
-saying which of the registers belong to it.  Then you can specify
-register classes that are allowed as operands to particular
-instruction patterns.
-
-In general, each register will belong to several classes.  In fact,
-one class must be named `ALL_REGS' and contain all the registers. 
-Another class must be named `NO_REGS' and contain no registers. 
-Often the union of two classes will be another class; however, this
-is not required.
-
-One of the classes must be named `GENERAL_REGS'.  There is nothing
-terribly special about the name, but the operand constraint letters
-`r' and `g' specify this class.  If `GENERAL_REGS' is the same as
-`ALL_REGS', just define it as a macro which expands to `ALL_REGS'.
-
-The way classes other than `GENERAL_REGS' are specified in operand
-constraints is through machine-dependent operand constraint letters. 
-You can define such letters to correspond to various classes, then
-use them in operand constraints.
-
-You should define a class for the union of two classes whenever some
-instruction allows both classes.  For example, if an instruction
-allows either a floating-point (coprocessor) register or a general
-register for a certain operand, you should define a class
-`FLOAT_OR_GENERAL_REGS' which includes both of them.  Otherwise you
-will get suboptimal code.
-
-You must also specify certain redundant information about the
-register classes: for each class, which classes contain it and which
-ones are contained in it; for each pair of classes, the largest class
-contained in their union.
-
-Register classes used for input-operands of bitwise-and or shift
-instructions have a special requirement: each such class must have,
-for each fixed-point machine mode, a subclass whose registers can
-transfer that mode to or from memory.  For example, on some machines,
-the operations for single-byte values (`QImode') are limited to
-certain registers.  When this is so, each register class that is used
-in a bitwise-and or shift instruction must have a subclass consisting
-of registers from which single-byte values can be loaded or stored. 
-This is so that `PREFERRED_RELOAD_CLASS' can always have a possible
-value to return.
-
-`enum reg_class'
-     An enumeral type that must be defined with all the register
-     class names as enumeral values.  `NO_REGS' must be first. 
-     `ALL_REGS' must be the last register class, followed by one more
-     enumeral value, `LIM_REG_CLASSES', which is not a register class
-     but rather tells how many classes there are.
-
-     Each register class has a number, which is the value of casting
-     the class name to type `int'.  The number serves as an index in
-     many of the tables described below.
-
-`N_REG_CLASSES'
-     The number of distinct register classes, defined as follows:
-
-          #define N_REG_CLASSES (int) LIM_REG_CLASSES
-
-`REG_CLASS_NAMES'
-     An initializer containing the names of the register classes as C
-     string constants.  These names are used in writing some of the
-     debugging dumps.
-
-`REG_CLASS_CONTENTS'
-     An initializer containing the contents of the register classes,
-     as integers which are bit masks.  The Nth integer specifies the
-     contents of class N.  The way the integer MASK is interpreted is
-     that register R is in the class if `MASK & (1 << R)' is 1.
-
-     When the machine has more than 32 registers, an integer does not
-     suffice.  Then the integers are replaced by sub-initializers,
-     braced groupings containing several integers.  Each
-     sub-initializer must be suitable as an initializer for the type
-     `HARD_REG_SET' which is defined in `hard-reg-set.h'.
-
-`REGNO_REG_CLASS (REGNO)'
-     A C expression whose value is a register class containing hard
-     register REGNO.  In general there is more that one such class;
-     choose a class which is "minimal", meaning that no smaller class
-     also contains the register.
-
-`BASE_REG_CLASS'
-     A macro whose definition is the name of the class to which a
-     valid base register must belong.  A base register is one used in
-     an address which is the register value plus a displacement.
-
-`INDEX_REG_CLASS'
-     A macro whose definition is the name of the class to which a
-     valid index register must belong.  An index register is one used
-     in an address where its value is either multiplied by a scale
-     factor or added to another register (as well as added to a
-     displacement).
-
-`REG_CLASS_FROM_LETTER (CHAR)'
-     A C expression which defines the machine-dependent operand
-     constraint letters for register classes.  If CHAR is such a
-     letter, the value should be the register class corresponding to
-     it.  Otherwise, the value should be `NO_REGS'.
-
-`REGNO_OK_FOR_BASE_P (NUM)'
-     A C expression which is nonzero if register number NUM is
-     suitable for use as a base register in operand addresses.  It
-     may be either a suitable hard register or a pseudo register that
-     has been allocated such a hard register.
-
-`REGNO_OK_FOR_INDEX_P (NUM)'
-     A C expression which is nonzero if register number NUM is
-     suitable for use as an index register in operand addresses.  It
-     may be either a suitable hard register or a pseudo register that
-     has been allocated such a hard register.
-
-     The difference between an index register and a base register is
-     that the index register may be scaled.  If an address involves
-     the sum of two registers, neither one of them scaled, then
-     either one may be labeled the ``base'' and the other the
-     ``index''; but whichever labeling is used must fit the machine's
-     constraints of which registers may serve in each capacity.  The
-     compiler will try both labelings, looking for one that is valid,
-     and will reload one or both registers only if neither labeling
-     works.
-
-`PREFERRED_RELOAD_CLASS (X, CLASS)'
-     A C expression that places additional restrictions on the
-     register class to use when it is necessary to copy value X into
-     a register in class CLASS.  The value is a register class;
-     perhaps CLASS, or perhaps another, smaller class.  On many
-     machines, the definition
-
-          #define PREFERRED_RELOAD_CLASS(X,CLASS) CLASS
-
-     is safe.
-
-     Sometimes returning a more restrictive class makes better code. 
-     For example, on the 68000, when X is an integer constant that is
-     in range for a `moveq' instruction, the value of this macro is
-     always `DATA_REGS' as long as CLASS includes the data registers.
-     Requiring a data register guarantees that a `moveq' will be used.
-
-     If X is a `const_double', by returning `NO_REGS' you can force X
-     into a memory constant.  This is useful on certain machines
-     where immediate floating values cannot be loaded into certain
-     kinds of registers.
-
-     In a shift instruction or a bitwise-and instruction, the mode of
-     X, the value being reloaded, may not be the same as the mode of
-     the instruction's operand.  (They will both be fixed-point
-     modes, however.)  In such a case, CLASS may not be a safe value
-     to return.  CLASS is certainly valid for the instruction, but it
-     may not be valid for reloading X.  This problem can occur on
-     machines such as the 68000 and 80386 where some registers can
-     handle full-word values but cannot handle single-byte values.
-
-     On such machines, this macro must examine the mode of X and
-     return a subclass of CLASS which can handle loads and stores of
-     that mode.  On the 68000, where address registers cannot handle
-     `QImode', if X has `QImode' then you must return `DATA_REGS'. 
-     If CLASS is `ADDR_REGS', then there is no correct value to
-     return; but the shift and bitwise-and instructions don't use
-     `ADDR_REGS', so this fatal case never arises.
-
-`CLASS_MAX_NREGS (CLASS, MODE)'
-     A C expression for the maximum number of consecutive registers
-     of class CLASS needed to hold a value of mode MODE.
-
-     This is closely related to the macro `HARD_REGNO_NREGS'.  In
-     fact, the value of the macro `CLASS_MAX_NREGS (CLASS, MODE)'
-     should be the maximum value of `HARD_REGNO_NREGS (REGNO, MODE)'
-     for all REGNO values in the class CLASS.
-
-     This macro helps control the handling of multiple-word values in
-     the reload pass.
-
-Two other special macros describe which constants fit which
-constraint letters.
-
-`CONST_OK_FOR_LETTER_P (VALUE, C)'
-     A C expression that defines the machine-dependent operand
-     constraint letters that specify particular ranges of integer
-     values.  If C is one of those letters, the expression should
-     check that VALUE, an integer, is in the appropriate range and
-     return 1 if so, 0 otherwise.  If C is not one of those letters,
-     the value should be 0 regardless of VALUE.
-
-`CONST_DOUBLE_OK_FOR_LETTER_P (VALUE, C)'
-     A C expression that defines the machine-dependent operand
-     constraint letters that specify particular ranges of floating
-     values.  If C is one of those letters, the expression should
-     check that VALUE, an RTX of code `const_double', is in the
-     appropriate range and return 1 if so, 0 otherwise.  If C is not
-     one of those letters, the value should be 0 regardless of VALUE.
-
-
-
-File: internals,  Node: Stack Layout,  Next: Library Names,  Prev: Register Classes,  Up: Machine Macros
+File: gcc.info,  Node: Stack Layout,  Next: Library Names,  Prev: Register Classes,  Up: Machine Macros
 
 Describing Stack Layout
 =======================
@@ -561,6 +76,19 @@ Describing Stack Layout
      type of the function.  (In the next version of GNU CC, the
      argument will be changed to the function data type rather than
      its declaration.)
+
+`FIRST_PARM_CALLER_OFFSET (FUNDECL)'
+     Define this macro on machines where register parameters have
+     shadow locations on the stack, at addresses below the nominal
+     parameter.  This matters because certain arguments cannot be
+     passed on the stack.  On these machines, such arguments must be
+     stored into the shadow locations.
+
+     This macro should expand into a C expression whose value is the
+     offset of the first parameter's shadow location from the nominal
+     stack pointer value.  (That value is itself computed by adding
+     the value of `STACK_POINTER_OFFSET' to the stack pointer
+     register.)
 
 `RETURN_POPS_ARGS (FUNTYPE)'
      A C expression that should be 1 if a function pops its own
@@ -861,7 +389,7 @@ Describing Stack Layout
 
 
 
-File: internals,  Node: Library Names,  Next: Addressing Modes,  Prev: Stack Layout,  Up: Machine Macros
+File: gcc.info,  Node: Library Names,  Next: Addressing Modes,  Prev: Stack Layout,  Up: Machine Macros
 
 Library Subroutine Names
 ========================
@@ -885,7 +413,7 @@ Library Subroutine Names
 
 
 
-File: internals,  Node: Addressing Modes,  Next: Misc,  Prev: Library Names,  Up: Machine Macros
+File: gcc.info,  Node: Addressing Modes,  Next: Misc,  Prev: Library Names,  Up: Machine Macros
 
 Addressing Modes
 ================
@@ -1013,5 +541,208 @@ Addressing Modes
      you need not check these things.  In fact, `1' is a suitable
      definition for this macro on machines where any `const_double'
      is valid and anything `CONSTANT_P' is valid.
+
+
+
+File: gcc.info,  Node: Misc,  Next: Condition Code,  Prev: Addressing Modes,  Up: Machine Macros
+
+Miscellaneous Parameters
+========================
+
+`CASE_VECTOR_MODE'
+     An alias for a machine mode name.  This is the machine mode that
+     elements of a jump-table should have.
+
+`CASE_VECTOR_PC_RELATIVE'
+     Define this macro if jump-tables should contain relative
+     addresses.
+
+`CASE_DROPS_THROUGH'
+     Define this if control falls through a `case' insn when the
+     index value is out of range.  This means the specified
+     default-label is actually ignored by the `case' insn proper.
+
+`IMPLICIT_FIX_EXPR'
+     An alias for a tree code that should be used by default for
+     conversion of floating point values to fixed point.  Normally,
+     `FIX_ROUND_EXPR' is used.
+
+`FIXUNS_TRUNC_LIKE_FIX_TRUNC'
+     Define this macro if the same instructions that convert a
+     floating point number to a signed fixed point number also
+     convert validly to an unsigned one.
+
+`EASY_DIV_EXPR'
+     An alias for a tree code that is the easiest kind of division to
+     compile code for in the general case.  It may be
+     `TRUNC_DIV_EXPR', `FLOOR_DIV_EXPR', `CEIL_DIV_EXPR' or
+     `ROUND_DIV_EXPR'.  These four division operators differ in how
+     they round the result to an integer.  `EASY_DIV_EXPR' is used
+     when it is permissible to use any of those kinds of division and
+     the choice should be made on the basis of efficiency.
+
+`DEFAULT_SIGNED_CHAR'
+     An expression whose value is 1 or 0, according to whether the
+     type `char' should be signed or unsigned by default.  The user
+     can always override this default with the options
+     `-fsigned-char' and `-funsigned-char'.
+
+`SCCS_DIRECTIVE'
+     Define this if the preprocessor should ignore `#sccs' directives
+     and print no error message.
+
+`IDENT_DIRECTIVE'
+     Define this if the preprocessor should ignore `#ident'
+     directives and print no error message.
+
+`MOVE_MAX'
+     The maximum number of bytes that a single instruction can move
+     quickly from memory to memory.
+
+`INT_TYPE_SIZE'
+     A C expression for the size in bits of the type `int' on the
+     target machine.
+
+`SLOW_BYTE_ACCESS'
+     Define this macro as a C expression which is nonzero if
+     accessing less than a word of memory (i.e. a `char' or a
+     `short') is slow (requires more than one instruction).
+
+`SLOW_ZERO_EXTEND'
+     Define this macro if zero-extension (of a `char' or `short' to
+     an `int') can be done faster if the destination is a register
+     that is known to be zero.
+
+     If you define this macro, you must have instruction patterns
+     that recognize RTL structures like this:
+
+          (set (strict-low-part (subreg:QI (reg:SI ...) 0)) ...)
+
+     and likewise for `HImode'.
+
+`SHIFT_COUNT_TRUNCATED'
+     Define this macro if shift instructions ignore all but the
+     lowest few bits of the shift count.  It implies that a
+     sign-extend or zero-extend instruction for the shift count can
+     be omitted.
+
+`TRULY_NOOP_TRUNCATION (OUTPREC, INPREC)'
+     A C expression which is nonzero if on this machine it is safe to
+     ``convert'' an integer of INPREC bits to one of OUTPREC bits
+     (where OUTPREC is smaller than INPREC) by merely operating on it
+     as if it had only OUTPREC bits.
+
+     On many machines, this expression can be 1.
+
+`NO_FUNCTION_CSE'
+     Define this macro if it is as good or better to call a constant
+     function address than to call an address kept in a register.
+
+`PROMOTE_PROTOTYPES'
+     Define this macro if an argument declared as `char' or `short'
+     in a prototype should actually be passed as an `int'.  In
+     addition to avoiding errors in certain cases of mismatch, it
+     also makes for better code on certain machines.
+
+`STORE_FLAG_VALUE'
+     A C expression for the value stored by a store-flag instruction
+     (`sCOND') when the condition is true.  This is usually 1 or -1;
+     it is required to be an odd number.
+
+     Do not define `STORE_FLAG_VALUE' if the machine has no
+     store-flag instructions.
+
+`Pmode'
+     An alias for the machine mode for pointers.  Normally the
+     definition can be
+
+          #define Pmode SImode
+
+`FUNCTION_MODE'
+     An alias for the machine mode used for memory references to
+     functions being called, in `call' RTL expressions.  On most
+     machines this should be `QImode'.
+
+`INSN_MACHINE_INFO'
+     This macro should expand into a C structure type to use for the
+     machine-dependent info field specified with the optional last
+     argument in `define_insn' and `define_peephole' patterns.  For
+     example, it might expand into `struct machine_info'; then it
+     would be up to you to define this structure in the `tm.h' file.
+
+     You do not need to define this macro if you do not write the
+     optional last argument in any of the patterns in the machine
+     description.
+
+`CONST_COSTS (X, CODE)'
+     A part of a C `switch' statement that describes the relative
+     costs of constant RTL expressions.  It must contain `case'
+     labels for expression codes `const_int', `const', `symbol_ref',
+     `label_ref' and `const_double'.  Each case must ultimately reach
+     a `return' statement to return the relative cost of the use of
+     that kind of constant value in an expression.  The cost may
+     depend on the precise value of the constant, which is available
+     for examination in X.
+
+     CODE is the expression code--redundant, since it can be obtained
+     with `GET_CODE (X)'.
+
+`DOLLARS_IN_IDENTIFIERS'
+     Define this to be nonzero if the character `$' should be allowed
+     by default in identifier names.
+
+
+
+File: gcc.info,  Node: Condition Code,  Next: Assembler Format,  Prev: Misc,  Up: Machine Macros
+
+Condition Code Information
+==========================
+
+The file `conditions.h' defines a variable `cc_status' to describe
+how the condition code was computed (in case the interpretation of
+the condition code depends on the instruction that it was set by). 
+This variable contains the RTL expressions on which the condition
+code is currently based, and several standard flags.
+
+Sometimes additional machine-specific flags must be defined in the
+machine description header file.  It can also add additional
+machine-specific information by defining `CC_STATUS_MDEP'.
+
+`CC_STATUS_MDEP'
+     C code for a data type which is used for declaring the `mdep'
+     component of `cc_status'.  It defaults to `int'.
+
+`CC_STATUS_MDEP_INIT'
+     A C expression for the initial value of the `mdep' field.  It
+     defaults to 0.
+
+`NOTICE_UPDATE_CC (EXP, INSN)'
+     A C compound statement to set the components of `cc_status'
+     appropriately for an insn INSN whose body is EXP.  It is this
+     macro's responsibility to recognize insns that set the condition
+     code as a byproduct of other activity as well as those that
+     explicitly set `(cc0)'.
+
+     If there are insn that do not set the condition code but do
+     alter other machine registers, this macro must check to see
+     whether they invalidate the expressions that the condition code
+     is recorded as reflecting.  For example, on the 68000, insns
+     that store in address registers do not set the condition code,
+     which means that usually `NOTICE_UPDATE_CC' can leave
+     `cc_status' unaltered for such insns.  But suppose that the
+     previous insn set the condition code based on location
+     `a4@(102)' and the current insn stores a new value in `a4'. 
+     Although the condition code is not changed by this, it will no
+     longer be true that it reflects the contents of `a4@(102)'. 
+     Therefore, `NOTICE_UPDATE_CC' must alter `cc_status' in this
+     case to say that nothing is known about the condition code value.
+
+     The definition of `NOTICE_UPDATE_CC' must be prepared to deal
+     with the results of peephole optimization: insns whose patterns
+     are `parallel' RTXs containing various `reg', `mem' or constants
+     which are just the operands.  The RTL structure of these insns
+     is not sufficient to indicate what the insns actually do.  What
+     `NOTICE_UPDATE_CC' should do when it sees one is just to run
+     `CC_STATUS_INIT'.
 
 

@@ -1,7 +1,7 @@
-Info file internals, produced by Makeinfo, -*- Text -*- from input
-file internals.texinfo.
+Info file gcc.info, produced by Makeinfo, -*- Text -*- from input
+file gcc.texinfo.
 
-This file documents the internals of the GNU compiler.
+This file documents the use and the internals of the GNU compiler.
 
 Copyright (C) 1988 Free Software Foundation, Inc.
 
@@ -25,7 +25,97 @@ English.
 
 
 
-File: internals,  Node: Passes,  Next: RTL,  Prev: Interface,  Up: Top
+File: gcc.info,  Node: Interface,  Next: Passes,  Prev: Portability,  Up: Top
+
+Interfacing to GNU CC Output
+****************************
+
+GNU CC is normally configured to use the same function calling
+convention normally in use on the target system.  This is done with
+the machine-description macros described (*note Machine Macros::.).
+
+However, returning of structure and union values is done differently
+on some target machines.  As a result, functions compiled with PCC
+returning such types cannot be called from code compiled with GNU CC,
+and vice versa.  This does not cause trouble often because few Unix
+library routines return structures or unions.
+
+GNU CC code returns structures and unions that are 1, 2, 4 or 8 bytes
+long in the same registers used for `int' or `double' return values. 
+(GNU CC typically allocates variables of such types in registers
+also.)  Structures and unions of other sizes are returned by storing
+them into an address passed by the caller (usually in a register). 
+The machine-description macros `STRUCT_VALUE' and
+`STRUCT_INCOMING_VALUE' tell GNU CC where to pass this address.
+
+By contrast, PCC on most target machines returns structures and
+unions of any size by copying the data into an area of static
+storage, and then returning the address of that storage as if it were
+a pointer value.  The caller must copy the data from that memory area
+to the place where the value is wanted.  This is slower than the
+method used by GNU CC, and fails to be reentrant.
+
+On some target machines, such as RISC machines and the 80386, the
+standard system convention is to pass to the subroutine the address
+of where to return the value.  On these machines, GNU CC has been
+configured to be compatible with the standard compiler, when this
+method is used.  It may not be compatible for structures of 1, 2, 4
+or 8 bytes.
+
+GNU CC uses the system's standard convention for passing arguments. 
+On some machines, the first few arguments are passed in registers; in
+others, all are passed on the stack.  It would be possible to use
+registers for argument passing on any machine, and this would
+probably result in a significant speedup.  But the result would be
+complete incompatibility with code that follows the standard
+convention.  So this change is practical only if you are switching to
+GNU CC as the sole C compiler for the system.  We may implement
+register argument passing on certain machines once we have a complete
+GNU system so that we can compile the libraries with GNU CC.
+
+If you use `longjmp', beware of automatic variables.  ANSI C says
+that automatic variables that are not declared `volatile' have
+undefined values after a `longjmp'.  And this is all GNU CC promises
+to do, because it is very difficult to restore register variables
+correctly, and one of GNU CC's features is that it can put variables
+in registers without your asking it to.
+
+If you want a variable to be unaltered by `longjmp', and you don't
+want to write `volatile' because old C compilers don't accept it,
+just take the address of the variable.  If a variable's address is
+ever taken, even if just to compute it and ignore it, then the
+variable cannot go in a register:
+
+     {
+       int careful;
+       &careful;
+       ...
+     }
+
+Code compiled with GNU CC may call certain library routines.  Most of
+them handle arithmetic for which there are no instructions.  This
+includes multiply and divide on some machines, and floating point
+operations on any machine for which floating point support is
+disabled with `-msoft-float'.  Some standard parts of the C library,
+such as `bcopy' or `memcpy', are also called automatically.  The
+usual function call interface is used for calling the library routines.
+
+These library routines should be defined in the library `gnulib',
+which GNU CC automatically searches whenever it links a program.  On
+machines that have multiply and divide instructions, if hardware
+floating point is in use, normally `gnulib' is not needed, but it is
+searched just in case.
+
+Each arithmetic function is defined in `gnulib.c' to use the
+corresponding C arithmetic operator.  As long as the file is compiled
+with another C compiler, which supports all the C arithmetic
+operators, this file will work portably.  However, `gnulib.c' does
+not work if compiled with GNU CC, because each arithmetic function
+would compile into a call to itself!
+
+
+
+File: gcc.info,  Node: Passes,  Next: RTL,  Prev: Interface,  Up: Top
 
 Passes and Files of the Compiler
 ********************************
@@ -288,7 +378,7 @@ Some additional files are used by all or many passes:
 
 
 
-File: internals,  Node: RTL,  Next: Machine Desc,  Prev: Passes,  Up: Top
+File: gcc.info,  Node: RTL,  Next: Machine Desc,  Prev: Passes,  Up: Top
 
 RTL Representation
 ******************
@@ -326,7 +416,7 @@ the internal form.
 
  
 
-File: internals,  Node: RTL Objects,  Next: Accessors,  Prev: RTL,  Up: RTL
+File: gcc.info,  Node: RTL Objects,  Next: Accessors,  Prev: RTL,  Up: RTL
 
 RTL Object Types
 ================
@@ -386,7 +476,7 @@ normally wanted.  The written form of this is `(nil)'.
 
 
 
-File: internals,  Node: Accessors,  Next: Flags,  Prev: RTL Objects,  Up: RTL
+File: gcc.info,  Node: Accessors,  Next: Flags,  Prev: RTL Objects,  Up: RTL
 
 Access to Operands
 ==================
@@ -468,13 +558,63 @@ elements as well as to access them.
 
 
 
-File: internals,  Node: Flags,  Next: Machine Modes,  Prev: Accessors,  Up: RTL
+File: gcc.info,  Node: Flags,  Next: Machine Modes,  Prev: Accessors,  Up: RTL
 
 Flags in an RTL Expression
 ==========================
 
 RTL expressions contain several flags (one-bit bit-fields) that are
-used in certain types of expression.
+used in certain types of expression.  Most often they are accessed
+with the following macros:
+
+`MEM_VOLATILE_P (X)'
+     In `mem' expressions, nonzero for volatile memory references. 
+     Stored in the `volatil' field and printed as `/v'.
+
+`MEM_IN_STRUCT_P (X)'
+     In `mem' expressions, nonzero for reference to an entire
+     structure, union or array, or to a component of one.  Zero for
+     references to a scalar variable or through a pointer to a scalar.
+     Stored in the `in_struct' field and printed as `/s'.
+
+`REG_USER_VAR_P (X)'
+     In a `reg', nonzero if it corresponds to a variable present in
+     the user's source code.  Zero for temporaries generated
+     internally by the compiler.  Stored in the `volatil' field and
+     printed as `/v'.
+
+`REG_FUNCTION_VALUE_P (X)'
+     Nonzero in a `reg' if it is the place in which this function's
+     value is going to be returned.  (This happens only in a hard
+     register.)  Stored in the `integrated' field and printed as `/i'.
+
+     The same hard register may be used also for collecting the
+     values of functions called by this one, but
+     `REG_FUNCTION_VALUE_P' is zero in this kind of use.
+
+`RTX_UNCHANGING_P (X)'
+     Nonzero in a `reg' or `mem' if the value is not changed
+     explicitly by the current function.  (If it is a memory
+     reference then it may be changed by other functions or by
+     aliasing.)  Stored in the `unchanging' field and printed as `/u'.
+
+`RTX_INTEGRATED_P (INSN)'
+     Nonzero in an insn if it resulted from an in-line function call.
+     Stored in the `integrated' field and printed as `/i'.  This may
+     be deleted; nothing currently depends on it.
+
+`INSN_DELETED_P (INSN)'
+     In an insn, nonzero if the insn has been deleted.  Stored in the
+     `volatil' field and printed as `/v'.
+
+`CONSTANT_POOL_ADDRESS_P (X)'
+     Nonzero in a `symbol_ref' if it refers to part of the current
+     function's ``constants pool''.  These are addresses close to the
+     beginning of the function, and GNU CC assumes they can be
+     addressed directly (perhaps with the help of base registers). 
+     Stored in the `unchanging' field and printed as `/u'.
+
+These are the fields which the above macros refer to:
 
 `used'
      This flag is used only momentarily, at the end of RTL generation
@@ -527,7 +667,7 @@ used in certain types of expression.
 
 
 
-File: internals,  Node: Machine Modes,  Next: Constants,  Prev: Flags,  Up: RTL
+File: gcc.info,  Node: Machine Modes,  Next: Constants,  Prev: Flags,  Up: RTL
 
 Machine Modes
 =============
@@ -647,7 +787,7 @@ Here are some C macros that relate to machine modes:
 
 
 
-File: internals,  Node: Constants,  Next: Regs and Memory,  Prev: Machine Modes,  Up: RTL
+File: gcc.info,  Node: Constants,  Next: Regs and Memory,  Prev: Machine Modes,  Up: RTL
 
 Constant Expression Types
 =========================
@@ -667,17 +807,20 @@ The simplest RTL expressions are those that represent constant values.
      appropriate.
 
 `(const_double:M I0 I1)'
-     Represents a floating point constant value of mode M.  The two
-     integers I0 and I1 together contain the bits of a `double'
-     value.  To convert them to a `double', do
+     Represents a 64-bit constant or mode M.  All floating point
+     constants are represented in this way, and so are 64-bit
+     `DImode' integer constants.
+
+     The two integers I0 and I1 together contain the bits of the
+     value.  If the constant is floating point (either single or
+     double precision), then they represent a `double'.  To convert
+     them to a `double', do
 
           union { double d; int i[2];} u;
           u.i[0] = XINT (x, 0);
           u.i[1] = XINT (x, 1);
 
-     and then refer to `u.d'.  The value of the constant is
-     represented as a double in this fashion even if the value
-     represented is single-precision.
+     and then refer to `u.d'.
 
      The global variables `dconst0_rtx' and `fconst0_rtx' hold
      `const_double' expressions with value 0, in modes `DFmode' and
@@ -708,7 +851,7 @@ The simplest RTL expressions are those that represent constant values.
 
 
 
-File: internals,  Node: Regs and Memory,  Next: Arithmetic,  Prev: Constants,  Up: RTL
+File: gcc.info,  Node: Regs and Memory,  Next: Arithmetic,  Prev: Constants,  Up: RTL
 
 Registers and Memory
 ====================
@@ -842,7 +985,7 @@ registers and to main memory.
 
 
 
-File: internals,  Node: Arithmetic,  Next: Comparisons,  Prev: Regs and Memory,  Up: RTL
+File: gcc.info,  Node: Arithmetic,  Next: Comparisons,  Prev: Regs and Memory,  Up: RTL
 
 RTL Expressions for Arithmetic
 ==============================
@@ -969,197 +1112,5 @@ RTL Expressions for Arithmetic
      in X, represented as an integer of mode M.  (The value is zero
      if X is zero.)  The mode of X need not be M; depending on the
      target machine, various mode combinations may be valid.
-
-
-
-File: internals,  Node: Comparisons,  Next: Bit Fields,  Prev: Arithmetic,  Up: RTL
-
-Comparison Operations
-=====================
-
-Comparison operators test a relation on two operands and are
-considered to represent the value 1 if the relation holds, or zero if
-it does not.  The mode of the comparison is determined by the
-operands; they must both be valid for a common machine mode.  A
-comparison with both operands constant would be invalid as the
-machine mode could not be deduced from it, but such a comparison
-should never exist in RTL due to constant folding.
-
-Inequality comparisons come in two flavors, signed and unsigned. 
-Thus, there are distinct expression codes `gt' and `gtu' for signed
-and unsigned greater-than.  These can produce different results for
-the same pair of integer values: for example, 1 is signed
-greater-than -1 but not unsigned greater-than, because -1 when
-regarded as unsigned is actually `0xffffffff' which is greater than 1.
-
-The signed comparisons are also used for floating point values. 
-Floating point comparisons are distinguished by the machine modes of
-the operands.
-
-The comparison operators may be used to compare the condition codes
-`(cc0)' against zero, as in `(eq (cc0) (const_int 0))'.  Such a
-construct actually refers to the result of the preceding instruction
-in which the condition codes were set.  The above example stands for
-1 if the condition codes were set to say ``zero'' or ``equal'', 0
-otherwise.  Although the same comparison operators are used for this
-as may be used in other contexts on actual data, no confusion can
-result since the machine description would never allow both kinds of
-uses in the same context.
-
-`(eq X Y)'
-     1 if the values represented by X and Y are equal, otherwise 0.
-
-`(ne X Y)'
-     1 if the values represented by X and Y are not equal, otherwise 0.
-
-`(gt X Y)'
-     1 if the X is greater than Y.  If they are fixed-point, the
-     comparison is done in a signed sense.
-
-`(gtu X Y)'
-     Like `gt' but does unsigned comparison, on fixed-point numbers
-     only.
-
-`(lt X Y)'
-`(ltu X Y)'
-     Like `gt' and `gtu' but test for ``less than''.
-
-`(ge X Y)'
-`(geu X Y)'
-     Like `gt' and `gtu' but test for ``greater than or equal''.
-
-`(le X Y)'
-`(leu X Y)'
-     Like `gt' and `gtu' but test for ``less than or equal''.
-
-`(if_then_else COND THEN ELSE)'
-     This is not a comparison operation but is listed here because it
-     is always used in conjunction with a comparison operation.  To
-     be precise, COND is a comparison expression.  This expression
-     represents a choice, according to COND, between the value
-     represented by THEN and the one represented by ELSE.
-
-     On most machines, `if_then_else' expressions are valid only to
-     express conditional jumps.
-
-
-
-File: internals,  Node: Bit Fields,  Next: Conversions,  Prev: Comparisons,  Up: RTL
-
-Bit-fields
-==========
-
-Special expression codes exist to represent bit-field instructions. 
-These types of expressions are lvalues in RTL; they may appear on the
-left side of a assignment, indicating insertion of a value into the
-specified bit field.
-
-`(sign_extract:SI LOC SIZE POS)'
-     This represents a reference to a sign-extended bit-field
-     contained or starting in LOC (a memory or register reference). 
-     The bit field is SIZE bits wide and starts at bit POS.  The
-     compilation option `BITS_BIG_ENDIAN' says which end of the
-     memory unit POS counts from.
-
-     Which machine modes are valid for LOC depends on the machine,
-     but typically LOC should be a single byte when in memory or a
-     full word in a register.
-
-`(zero_extract:SI LOC SIZE POS)'
-     Like `sign_extract' but refers to an unsigned or zero-extended
-     bit field.  The same sequence of bits are extracted, but they
-     are filled to an entire word with zeros instead of by
-     sign-extension.
-
-
-
-File: internals,  Node: Conversions,  Next: RTL Declarations,  Prev: Bit Fields,  Up: RTL
-
-Conversions
-===========
-
-All conversions between machine modes must be represented by explicit
-conversion operations.  For example, an expression which is the sum
-of a byte and a full word cannot be written as `(plus:SI (reg:QI 34)
-(reg:SI 80))' because the `plus' operation requires two operands of
-the same machine mode.  Therefore, the byte-sized operand is enclosed
-in a conversion operation, as in
-
-     (plus:SI (sign_extend:SI (reg:QI 34)) (reg:SI 80))
-
-The conversion operation is not a mere placeholder, because there may
-be more than one way of converting from a given starting mode to the
-desired final mode.  The conversion operation code says how to do it.
-
-`(sign_extend:M X)'
-     Represents the result of sign-extending the value X to machine
-     mode M.  M must be a fixed-point mode and X a fixed-point value
-     of a mode narrower than M.
-
-`(zero_extend:M X)'
-     Represents the result of zero-extending the value X to machine
-     mode M.  M must be a fixed-point mode and X a fixed-point value
-     of a mode narrower than M.
-
-`(float_extend:M X)'
-     Represents the result of extending the value X to machine mode
-     M.  M must be a floating point mode and X a floating point value
-     of a mode narrower than M.
-
-`(truncate:M X)'
-     Represents the result of truncating the value X to machine mode
-     M.  M must be a fixed-point mode and X a fixed-point value of a
-     mode wider than M.
-
-`(float_truncate:M X)'
-     Represents the result of truncating the value X to machine mode
-     M.  M must be a floating point mode and X a floating point value
-     of a mode wider than M.
-
-`(float:M X)'
-     Represents the result of converting fixed point value X,
-     regarded as signed, to floating point mode M.
-
-`(unsigned_float:M X)'
-     Represents the result of converting fixed point value X,
-     regarded as unsigned, to floating point mode M.
-
-`(fix:M X)'
-     When M is a fixed point mode, represents the result of
-     converting floating point value X to mode M, regarded as signed.
-     How rounding is done is not specified, so this operation may be
-     used validly in compiling C code only for integer-valued operands.
-
-`(unsigned_fix:M X)'
-     Represents the result of converting floating point value X to
-     fixed point mode M, regarded as unsigned.  How rounding is done
-     is not specified.
-
-`(fix:M X)'
-     When M is a floating point mode, represents the result of
-     converting floating point value X (valid for mode M) to an
-     integer, still represented in floating point mode M, by rounding
-     towards zero.
-
-
-
-File: internals,  Node: RTL Declarations,  Next: Side Effects,  Prev: Conversions,  Up: RTL
-
-Declarations
-============
-
-Declaration expression codes do not represent arithmetic operations
-but rather state assertions about their operands.
-
-`(strict_low_part (subreg:M (reg:N R) 0))'
-     This expression code is used in only one context: operand 0 of a
-     `set' expression.  In addition, the operand of this expression
-     must be a `subreg' expression.
-
-     The presence of `strict_low_part' says that the part of the
-     register which is meaningful in mode N, but is not part of mode
-     M, is not to be altered.  Normally, an assignment to such a
-     subreg is allowed to have undefined effects on the rest of the
-     register when M is less than a word.
 
 

@@ -1,7 +1,7 @@
-Info file internals, produced by Makeinfo, -*- Text -*- from input
-file internals.texinfo.
+Info file gcc.info, produced by Makeinfo, -*- Text -*- from input
+file gcc.texinfo.
 
-This file documents the internals of the GNU compiler.
+This file documents the use and the internals of the GNU compiler.
 
 Copyright (C) 1988 Free Software Foundation, Inc.
 
@@ -25,7 +25,199 @@ English.
 
 
 
-File: internals,  Node: Side Effects,  Next: Incdec,  Prev: RTL Declarations,  Up: RTL
+File: gcc.info,  Node: Comparisons,  Next: Bit Fields,  Prev: Arithmetic,  Up: RTL
+
+Comparison Operations
+=====================
+
+Comparison operators test a relation on two operands and are
+considered to represent the value 1 if the relation holds, or zero if
+it does not.  The mode of the comparison is determined by the
+operands; they must both be valid for a common machine mode.  A
+comparison with both operands constant would be invalid as the
+machine mode could not be deduced from it, but such a comparison
+should never exist in RTL due to constant folding.
+
+Inequality comparisons come in two flavors, signed and unsigned. 
+Thus, there are distinct expression codes `gt' and `gtu' for signed
+and unsigned greater-than.  These can produce different results for
+the same pair of integer values: for example, 1 is signed
+greater-than -1 but not unsigned greater-than, because -1 when
+regarded as unsigned is actually `0xffffffff' which is greater than 1.
+
+The signed comparisons are also used for floating point values. 
+Floating point comparisons are distinguished by the machine modes of
+the operands.
+
+The comparison operators may be used to compare the condition codes
+`(cc0)' against zero, as in `(eq (cc0) (const_int 0))'.  Such a
+construct actually refers to the result of the preceding instruction
+in which the condition codes were set.  The above example stands for
+1 if the condition codes were set to say ``zero'' or ``equal'', 0
+otherwise.  Although the same comparison operators are used for this
+as may be used in other contexts on actual data, no confusion can
+result since the machine description would never allow both kinds of
+uses in the same context.
+
+`(eq X Y)'
+     1 if the values represented by X and Y are equal, otherwise 0.
+
+`(ne X Y)'
+     1 if the values represented by X and Y are not equal, otherwise 0.
+
+`(gt X Y)'
+     1 if the X is greater than Y.  If they are fixed-point, the
+     comparison is done in a signed sense.
+
+`(gtu X Y)'
+     Like `gt' but does unsigned comparison, on fixed-point numbers
+     only.
+
+`(lt X Y)'
+`(ltu X Y)'
+     Like `gt' and `gtu' but test for ``less than''.
+
+`(ge X Y)'
+`(geu X Y)'
+     Like `gt' and `gtu' but test for ``greater than or equal''.
+
+`(le X Y)'
+`(leu X Y)'
+     Like `gt' and `gtu' but test for ``less than or equal''.
+
+`(if_then_else COND THEN ELSE)'
+     This is not a comparison operation but is listed here because it
+     is always used in conjunction with a comparison operation.  To
+     be precise, COND is a comparison expression.  This expression
+     represents a choice, according to COND, between the value
+     represented by THEN and the one represented by ELSE.
+
+     On most machines, `if_then_else' expressions are valid only to
+     express conditional jumps.
+
+
+
+File: gcc.info,  Node: Bit Fields,  Next: Conversions,  Prev: Comparisons,  Up: RTL
+
+Bit-fields
+==========
+
+Special expression codes exist to represent bit-field instructions. 
+These types of expressions are lvalues in RTL; they may appear on the
+left side of a assignment, indicating insertion of a value into the
+specified bit field.
+
+`(sign_extract:SI LOC SIZE POS)'
+     This represents a reference to a sign-extended bit-field
+     contained or starting in LOC (a memory or register reference). 
+     The bit field is SIZE bits wide and starts at bit POS.  The
+     compilation option `BITS_BIG_ENDIAN' says which end of the
+     memory unit POS counts from.
+
+     Which machine modes are valid for LOC depends on the machine,
+     but typically LOC should be a single byte when in memory or a
+     full word in a register.
+
+`(zero_extract:SI LOC SIZE POS)'
+     Like `sign_extract' but refers to an unsigned or zero-extended
+     bit field.  The same sequence of bits are extracted, but they
+     are filled to an entire word with zeros instead of by
+     sign-extension.
+
+
+
+File: gcc.info,  Node: Conversions,  Next: RTL Declarations,  Prev: Bit Fields,  Up: RTL
+
+Conversions
+===========
+
+All conversions between machine modes must be represented by explicit
+conversion operations.  For example, an expression which is the sum
+of a byte and a full word cannot be written as `(plus:SI (reg:QI 34)
+(reg:SI 80))' because the `plus' operation requires two operands of
+the same machine mode.  Therefore, the byte-sized operand is enclosed
+in a conversion operation, as in
+
+     (plus:SI (sign_extend:SI (reg:QI 34)) (reg:SI 80))
+
+The conversion operation is not a mere placeholder, because there may
+be more than one way of converting from a given starting mode to the
+desired final mode.  The conversion operation code says how to do it.
+
+`(sign_extend:M X)'
+     Represents the result of sign-extending the value X to machine
+     mode M.  M must be a fixed-point mode and X a fixed-point value
+     of a mode narrower than M.
+
+`(zero_extend:M X)'
+     Represents the result of zero-extending the value X to machine
+     mode M.  M must be a fixed-point mode and X a fixed-point value
+     of a mode narrower than M.
+
+`(float_extend:M X)'
+     Represents the result of extending the value X to machine mode
+     M.  M must be a floating point mode and X a floating point value
+     of a mode narrower than M.
+
+`(truncate:M X)'
+     Represents the result of truncating the value X to machine mode
+     M.  M must be a fixed-point mode and X a fixed-point value of a
+     mode wider than M.
+
+`(float_truncate:M X)'
+     Represents the result of truncating the value X to machine mode
+     M.  M must be a floating point mode and X a floating point value
+     of a mode wider than M.
+
+`(float:M X)'
+     Represents the result of converting fixed point value X,
+     regarded as signed, to floating point mode M.
+
+`(unsigned_float:M X)'
+     Represents the result of converting fixed point value X,
+     regarded as unsigned, to floating point mode M.
+
+`(fix:M X)'
+     When M is a fixed point mode, represents the result of
+     converting floating point value X to mode M, regarded as signed.
+     How rounding is done is not specified, so this operation may be
+     used validly in compiling C code only for integer-valued operands.
+
+`(unsigned_fix:M X)'
+     Represents the result of converting floating point value X to
+     fixed point mode M, regarded as unsigned.  How rounding is done
+     is not specified.
+
+`(fix:M X)'
+     When M is a floating point mode, represents the result of
+     converting floating point value X (valid for mode M) to an
+     integer, still represented in floating point mode M, by rounding
+     towards zero.
+
+
+
+File: gcc.info,  Node: RTL Declarations,  Next: Side Effects,  Prev: Conversions,  Up: RTL
+
+Declarations
+============
+
+Declaration expression codes do not represent arithmetic operations
+but rather state assertions about their operands.
+
+`(strict_low_part (subreg:M (reg:N R) 0))'
+     This expression code is used in only one context: operand 0 of a
+     `set' expression.  In addition, the operand of this expression
+     must be a `subreg' expression.
+
+     The presence of `strict_low_part' says that the part of the
+     register which is meaningful in mode N, but is not part of mode
+     M, is not to be altered.  Normally, an assignment to such a
+     subreg is allowed to have undefined effects on the rest of the
+     register when M is less than a word.
+
+
+
+File: gcc.info,  Node: Side Effects,  Next: Incdec,  Prev: RTL Declarations,  Up: RTL
 
 Side Effect Expressions
 =======================
@@ -187,7 +379,7 @@ effects as such:
 
 
 
-File: internals,  Node: Incdec,  Next: Assembler,  Prev: Side Effects,  Up: RTL
+File: gcc.info,  Node: Incdec,  Next: Assembler,  Prev: Side Effects,  Up: RTL
 
 Embedded Side-Effects on Addresses
 ==================================
@@ -243,7 +435,7 @@ entries in the machine description.
 
 
 
-File: internals,  Node: Assembler,  Next: Insns,  Prev: IncDec,  Up: RTL
+File: gcc.info,  Node: Assembler,  Next: Insns,  Prev: IncDec,  Up: RTL
 
 Assembler Instructions as Expressions
 =====================================
@@ -280,7 +472,7 @@ number, which is 0, 1, ... for successive output operands.
 
 
 
-File: internals,  Node: Insns,  Next: Calls,  Prev: Assembler,  Up: RTL
+File: gcc.info,  Node: Insns,  Next: Calls,  Prev: Assembler,  Up: RTL
 
 Insns
 =====
@@ -484,6 +676,17 @@ whose meaning depends on the kind of note.  Here are the four kinds:
      The register OP contained zero before this insn.  You can rely
      on this note if it is present; its absence implies nothing.
 
+`REG_LIBCALL'
+     This is the inverse of `REG_RETVAL': it is placed on the first
+     insn of a library call, and it points to the last one.
+
+     Loop optimization uses this note to move an entire library call
+     out of a loop when its value is constant.
+
+`REG_NONNEG'
+     The register OP is known to have nonnegative value when this
+     insn is reached.
+
 (The only difference between the expression codes `insn_list' and
 `expr_list' is that the first operand of an `insn_list' is assumed to
 be an insn and is printed in debugging dumps as the insn's unique id;
@@ -492,7 +695,7 @@ an expression.)
 
 
 
-File: internals,  Node: Calls,  Next: Sharing,  Prev: Insns,  Up: RTL
+File: gcc.info,  Node: Calls,  Next: Sharing,  Prev: Insns,  Up: RTL
 
 RTL Representation of Function-Call Insns
 =========================================
@@ -550,7 +753,7 @@ RTL form as a call that returns nothing.
 
 
 
-File: internals,  Node: Sharing,  Prev: Calls,  Up: RTL
+File: gcc.info,  Node: Sharing,  Prev: Calls,  Up: RTL
 
 Structure Sharing Assumptions
 =============================
@@ -609,7 +812,7 @@ objects are common to two functions.
 
 
 
-File: internals,  Node: Machine Desc,  Next: Machine Macros,  Prev: RTL,  Up: Top
+File: gcc.info,  Node: Machine Desc,  Next: Machine Macros,  Prev: RTL,  Up: Top
 
 Machine Descriptions
 ********************
@@ -645,7 +848,7 @@ See the next chapter for information on the C header file.
 
  
 
-File: internals,  Node: Patterns,  Next: Example,  Prev: Machine Desc,  Up: Machine Desc
+File: gcc.info,  Node: Patterns,  Next: Example,  Prev: Machine Desc,  Up: Machine Desc
 
 Everything about Instruction Patterns
 =====================================
@@ -656,7 +859,7 @@ the pieces can be filled in, and an output pattern or C code to
 generate the assembler output, all wrapped up in a `define_insn'
 expression.
 
-A `define_insn' is an RTL expression containing four operands:
+A `define_insn' is an RTL expression containing four or five operands:
 
   1. An optional name.  The presence of a name indicate that this
      instruction pattern can perform a certain standard job for the
@@ -705,9 +908,19 @@ A `define_insn' is an RTL expression containing four operands:
      When simple substitution isn't general enough, you can specify a
      piece of C code to compute the output.  *Note Output Statement::.
 
+  5. Optionally, some "machine-specific information".  The meaning of
+     this information is defined only by an individual machine
+     description; typically it might say whether this insn alters the
+     condition codes, or how many bytes of output it generates.
+
+     This operand is written as a string containing a C initializer
+     (complete with braces) for the structure type
+     `INSN_MACHINE_INFO', whose definition is up to you (*note
+     Misc::.).
+
 
 
-File: internals,  Node: Example,  Next: RTL Template,  Prev: Patterns,  Up: Machine Desc
+File: gcc.info,  Node: Example,  Next: RTL Template,  Prev: Patterns,  Up: Machine Desc
 
 Example of `define_insn'
 ========================
@@ -739,7 +952,7 @@ specific type of CPU for which code is being generated.
 
 
 
-File: internals,  Node: RTL Template,  Next: Output Template,  Prev: Example,  Up: Machine Desc
+File: gcc.info,  Node: RTL Template,  Next: Output Template,  Prev: Example,  Up: Machine Desc
 
 RTL Template for Generating and Recognizing Insns
 =================================================
@@ -776,20 +989,25 @@ substitution of the operands.
      may be an empty string; then it means no test is to be done on
      the operand.
 
+     CONSTRAINT is explained later (*note Constraints::.).
+
      Most often, TESTFN is `"general_operand"'.  It checks that the
      putative operand is either a constant, a register or a memory
      reference, and that it is valid for mode M.
 
      For an operand that must be a register, TESTFN should be
-     `"register_operand"'.  This prevents GNU CC from creating insns
-     that have memory references in these operands, insns which would
-     only have to be taken apart in the reload pass.
+     `"register_operand"'.  It would be valid to use
+     `"general_operand"', since the reload pass would copy any
+     non-register operands through registers, but this would make GNU
+     CC do extra work, and it would prevent the register allocator
+     from doing the best possible job.
 
      For an operand that must be a constant, either TESTFN should be
      `"immediate_operand"', or the instruction pattern's extra
-     condition should check for constants, or both.
-
-     CONSTRAINT is explained later (*note Constraints::.).
+     condition should check for constants, or both.  You cannot
+     expect the constraints to do this work!  If the constraints
+     allow only constants, but the predicate allows something else,
+     the compiler will crash when that case arises.
 
 `(match_dup N)'
      This expression is also a placeholder for operand number N.  It
@@ -829,7 +1047,7 @@ substitution of the operands.
 
 
 
-File: internals,  Node: Output Template,  Next: Output Statement,  Prev: RTL Template,  Up: Machine Desc
+File: gcc.info,  Node: Output Template,  Next: Output Statement,  Prev: RTL Template,  Up: Machine Desc
 
 Output Templates and Operand Substitution
 =========================================
@@ -890,7 +1108,7 @@ output a period; the macro for MIT syntax defines it to do nothing.
 
 
 
-File: internals,  Node: Output Statement,  Next: Constraints,  Prev: Output Template,  Up: Machine Desc
+File: gcc.info,  Node: Output Statement,  Next: Constraints,  Prev: Output Template,  Up: Machine Desc
 
 C Statements for Generating Assembler Output
 ============================================
@@ -940,7 +1158,7 @@ pattern could use `which_alternative' to choose between them:
 
 
 
-File: internals,  Node: Constraints,  Next: Standard Names,  Prev: Output Statement,  Up: Machine Desc
+File: gcc.info,  Node: Constraints,  Next: Standard Names,  Prev: Output Statement,  Up: Machine Desc
 
 Operand Constraints
 ===================
@@ -962,198 +1180,3 @@ operands to match.
 * No Constraints::      Describing a clean machine without constraints.
 
  
-
-File: internals,  Node: Simple Constraints,  Next: Multi-Alternative,  Prev: Constraints,  Up: Constraints
-
-Simple Constraints
-------------------
-
-The simplest kind of constraint is a string full of letters, each of
-which describes one kind of operand that is permitted.  Here are the
-letters that are allowed:
-
-`m'
-     A memory operand is allowed, with any kind of address that the
-     machine supports in general.
-
-`o'
-     A memory operand is allowed, but only if the address is
-     "offsetable".  This means that adding a small integer (actually,
-     the width in bytes of the operand, as determined by its machine
-     mode) may be added to the address and the result is also a valid
-     memory address.
-
-     For example, an address which is constant is offsetable; so is
-     an address that is the sum of a register and a constant (as long
-     as a slightly larger constant is also within the range of
-     address-offsets supported by the machine); but an autoincrement
-     or autodecrement address is not offsetable.  More complicated
-     indirect/indexed addresses may or may not be offsetable
-     depending on the other addressing modes that the machine supports.
-
-     Note that in an output operand which can be matched by another
-     operand, the constraint letter `o' is valid only when
-     accompanied by both `<' (if the target machine has predecrement
-     addressing) and `>' (if the target machine has preincrement
-     addressing).
-
-`<'
-     A memory operand with autodecrement addressing (either
-     predecrement or postdecrement) is allowed.
-
-`>'
-     A memory operand with autoincrement addressing (either
-     preincrement or postincrement) is allowed.
-
-`r'
-     A register operand is allowed provided that it is in a general
-     register.
-
-`d', `a', `f', ...
-      Other letters can be defined in machine-dependent fashion to
-     stand for particular classes of registers.  `d', `a' and `f' are
-     defined on the 68000/68020 to stand for data, address and
-     floating point registers.
-
-`i'
-     An immediate integer operand (one with constant value) is allowed.
-     This includes symbolic constants whose values will be known only
-     at assembly time.
-
-`n'
-     An immediate integer operand with a known numeric value is
-     allowed.  Many systems cannot support assembly-time constants
-     for operands less than a word wide.  Constraints for these
-     operands should use `n' rather than `i'.
-
-`I', `J', `K', ...
-      Other letters in the range `I' through `M' may be defined in a
-     machine-dependent fashion to permit immediate integer operands
-     with explicit integer values in specified ranges.  For example,
-     on the 68000, `I' is defined to stand for the range of values 1
-     to 8.  This is the range permitted as a shift count in the shift
-     instructions.
-
-`F'
-     An immediate floating operand (expression code `const_double')
-     is allowed.
-
-`G', `H'
-     `G' and `H' may be defined in a machine-dependent fashion to
-     permit immediate floating operands in particular ranges of values.
-
-`s'
-     An immediate integer operand whose value is not an explicit
-     integer is allowed.
-
-     This might appear strange; if an insn allows a constant operand
-     with a value not known at compile time, it certainly must allow
-     any known value.  So why use `s' instead of `i'?  Sometimes it
-     allows better code to be generated.
-
-     For example, on the 68000 in a fullword instruction it is
-     possible to use an immediate operand; but if the immediate value
-     is between -32 and 31, better code results from loading the
-     value into a register and using the register.  This is because
-     the load into the register can be done with a `moveq'
-     instruction.  We arrange for this to happen by defining the
-     letter `K' to mean ``any integer outside the range -32 to 31'',
-     and then specifying `Ks' in the operand constraints.
-
-`g'
-     Any register, memory or immediate integer operand is allowed,
-     except for registers that are not general registers.
-
-`N' (a digit)
-     An operand that matches operand number N is allowed.  If a digit
-     is used together with letters, the digit should come last.
-
-     This is called a "matching constraint" and what it really means
-     is that the assembler has only a single operand that fills two
-     roles considered separate in the RTL insn.  For example, an add
-     insn has two input operands and one output operand in the RTL,
-     but on most machines an add instruction really has only two
-     operands, one of them an input-output operand.
-
-     Matching constraints work only in circumstances like that add
-     insn.  More precisely, the matching constraint must appear in an
-     input-only operand and the operand that it matches must be an
-     output-only operand with a lower number.
-
-     For operands to match in a particular case usually means that
-     they are identical-looking RTL expressions.  But in a few
-     special cases specific kinds of dissimilarity are allowed.  For
-     example, `*x' as an input operand will match `*x++' as an output
-     operand.  For proper results in such cases, the output template
-     should always use the output-operand's number when printing the
-     operand.
-
-`p'
-     An operand that is a valid memory address is allowed.  This is
-     for ``load address'' and ``push address'' instructions.
-
-     If `p' is used in the constraint, the test-function in the
-     `match_operand' must be `address_operand'.
-
-In order to have valid assembler code, each operand must satisfy its
-constraint.  But a failure to do so does not prevent the pattern from
-applying to an insn.  Instead, it directs the compiler to modify the
-code so that the constraint will be satisfied.  Usually this is done
-by copying an operand into a register.
-
-Contrast, therefore, the two instruction patterns that follow:
-
-     (define_insn ""
-       [(set (match_operand:SI 0 "general_operand" "r")
-             (plus:SI (match_dup 0)
-                      (match_operand:SI 1 "general_operand" "r")))]
-       ""
-       "...")
-
-which has two operands, one of which must appear in two places, and
-
-     (define_insn ""
-       [(set (match_operand:SI 0 "general_operand" "r")
-             (plus:SI (match_operand:SI 1 "general_operand" "0")
-                      (match_operand:SI 2 "general_operand" "r")))]
-       ""
-       "...")
-
-which has three operands, two of which are required by a constraint
-to be identical.  If we are considering an insn of the form
-
-     (insn N PREV NEXT
-       (set (reg:SI 3)
-            (plus:SI (reg:SI 6) (reg:SI 109)))
-       ...)
-
-the first pattern would not apply at all, because this insn does not
-contain two identical subexpressions in the right place.  The pattern
-would say, ``That does not look like an add instruction; try other
-patterns.'' The second pattern would say, ``Yes, that's an add
-instruction, but there is something wrong with it.''  It would direct
-the reload pass of the compiler to generate additional insns to make
-the constraint true.  The results might look like this:
-
-     (insn N2 PREV N
-       (set (reg:SI 3) (reg:SI 6))
-       ...)
-     
-     (insn N N2 NEXT
-       (set (reg:SI 3)
-            (plus:SI (reg:SI 3) (reg:SI 109)))
-       ...)
-
-Because insns that don't fit the constraints are fixed up by loading
-operands into registers, every instruction pattern's constraints must
-permit the case where all the operands are in registers.  It need not
-permit all classes of registers; the compiler knows how to copy
-registers into other registers of the proper class in order to make
-an instruction valid.  But if no registers are permitted, the
-compiler will be stymied: it does not know how to save a register in
-memory in order to make an instruction valid.  Instruction patterns
-that reject registers can be made valid by attaching a
-condition-expression that refuses to match an insn at all if the
-crucial operand is a register.
-
-

@@ -1,7 +1,7 @@
-Info file internals, produced by Makeinfo, -*- Text -*- from input
-file internals.texinfo.
+Info file gcc.info, produced by Makeinfo, -*- Text -*- from input
+file gcc.texinfo.
 
-This file documents the internals of the GNU compiler.
+This file documents the use and the internals of the GNU compiler.
 
 Copyright (C) 1988 Free Software Foundation, Inc.
 
@@ -25,7 +25,7 @@ English.
 
 
 
-File: internals,  Node: Top,  Next: Copying,  Up: (DIR)
+File: gcc.info,  Node: Top,  Next: Copying,  Up: (DIR)
 
 Introduction
 ************
@@ -54,7 +54,7 @@ to report bugs.
 
  
 
-File: internals,  Node: Copying,  Next: Contributors,  Prev: Top,  Up: Top
+File: gcc.info,  Node: Copying,  Next: Contributors,  Prev: Top,  Up: Top
 
 GNU CC GENERAL PUBLIC LICENSE
 *****************************
@@ -203,7 +203,7 @@ OR FOR ANY CLAIM BY ANY OTHER PARTY.
 
 
 
-File: internals,  Node: Contributors,  Next: Options,  Prev: Copying,  Up: Top
+File: gcc.info,  Node: Contributors,  Next: Options,  Prev: Copying,  Up: Top
 
 Contributors to GNU CC
 **********************
@@ -223,6 +223,9 @@ GNU CC.
      definitions, and of the Vax machine description.
 
    * Ted Lemon wrote parts of the RTL reader and printer.
+
+   * Jim Wilson implemented loop strength reduction and some other
+     loop optimizations.
 
    * Nobuyuki Hikichi of Software Research Associates, Tokyo,
      contributed the support for the SONY NEWS machine.
@@ -253,7 +256,7 @@ GNU CC.
 
 
 
-File: internals,  Node: Options,  Next: Installation,  Prev: Contributors,  Up: Top
+File: gcc.info,  Node: Options,  Next: Installation,  Prev: Contributors,  Up: Top
 
 GNU CC Command Options
 **********************
@@ -373,6 +376,10 @@ These options control the details of C compilation itself.
 
         * Out-of-range floating point literals are not an error.
 
+        * All automatic variables not declared `register' are
+          preserved by `longjmp'.  Ordinarily, GNU C follows ANSI C:
+          automatic variables not declared `volatile' may be clobbered.
+
         * In the preprocessor, comments convert to nothing at all,
           rather than to a space.  This allows traditional token
           concatenation.
@@ -382,6 +389,15 @@ These options control the details of C compilation itself.
           are stringified, though without additional quote marks,
           when they appear in such a context).  The preprocessor
           always considers a string constant to end at a newline.
+
+        * The predefined macro `__STDC__' is not defined when you use
+          `-traditional', but `__GNUC__' is (since the GNU extensions
+          which `__GNUC__' indicates are not affected by
+          `-traditional').  If you need to write header files that
+          work differently depending on whether `-traditional' is in
+          use, by testing both of these predefined macros you can
+          distinguish four situations: GNU C, traditional GNU C,
+          other ANSI C compilers, and other old C compilers.
 
 `-O'
      Optimize.  Optimizing compilation takes somewhat more time, and
@@ -407,7 +423,8 @@ These options control the details of C compilation itself.
 
 `-g'
      Produce debugging information in the operating system's native
-     format (for DBX or SDB).
+     format (for DBX or SDB).  GDB also can work with this debugging
+     information.
 
      Unlike most other C compilers, GNU CC allows you to use `-g'
      with `-O'.  The shortcuts taken by optimized code may
@@ -423,6 +440,13 @@ These options control the details of C compilation itself.
 `-gg'
      Produce debugging information in GDB's own format.  This
      requires the GNU assembler and linker in order to work.
+
+     This feature will probably be eliminated.  It was intended to
+     enable GDB to read the symbol table faster, but it doesn't
+     result in enough of a speedup to be worth the larger object
+     files and executables.  We are working on other ways of making
+     GDB start even faster, which work with DBX format debugging
+     information and could be made to work with SDB format.
 
 `-w'
      Inhibit all warning messages.
@@ -514,6 +538,10 @@ These options control the details of C compilation itself.
      Warn whenever a function is defined with a return-type that
      defaults to `int'.  Also warn about any `return' statement with
      no return-value in a function whose return-type is not `void'.
+
+`-Wunused'
+     Warn whenever a local variable is unused aside from its
+     declaration.
 
 `-Wcomment'
      Warn whenever a comment-start sequence `/*' appears in a comment.
@@ -670,6 +698,10 @@ These options control the details of C compilation itself.
           optimizing) lets arguments accumulate on the stack for
           several function calls and pops them all at once.
 
+    `-fstrength-reduce'
+          Perform the optimizations of loop strength reduction and
+          elimination of iteration variables.
+
     `-fcombine-regs'
           Allow the combine pass to combine an instruction that
           copies one register into another.  This might or might not
@@ -787,8 +819,8 @@ These options control the details of C compilation itself.
           pointer or frame pointer, will produce disastrous results.
 
           A different sort of disaster will result from the use of
-          this flag for a register in which function values are may
-          be returned.
+          this flag for a register in which function values may be
+          returned.
 
 `-dLETTERS'
      Says to make debugging dumps at times specified by LETTERS. 
@@ -907,7 +939,7 @@ output that is not suitable for actual compilation.
 
 
 
-File: internals,  Node: Installation,  Next: Trouble,  Prev: Options,  Up: Top
+File: gcc.info,  Node: Installation,  Next: Trouble,  Prev: Options,  Up: Top
 
 Installing GNU CC
 *****************
@@ -924,33 +956,43 @@ Here is the procedure for installing GNU CC on a Unix system.
 
   2. On a Sequent system, go to the Berkeley universe.
 
-  3. Choose configuration files.
+  3. Choose configuration files.  The easy way to do this is to run
+     the command file `config.gcc' with a single argument, which is
+     the name of the machine as it appears in the `tm-MACHINE.h' file
+     name.
+
+     Here we spell out what files you need to set up:
 
         * Make a symbolic link named `config.h' to the top-level
           config file for the machine you are using (*note
           Config::.).  This file is responsible for defining
           information about the host machine.  It includes `tm.h'.
 
-          The file's name should be `config-MACHINE.h', with these
+          The file's name should be `xm-MACHINE.h', with these
           exceptions:
 
-         `config-vms.h'
+         `xm-vms.h'
                for vaxen running VMS.
 
-         `config-vaxv.h'
+         `xm-vaxv.h'
                for vaxen running system V.
 
-         `config-i386v.h'
+         `xm-i386v.h'
                for Intel 80386's running system V.
 
-         `config-sun4.h'
-               for Suns (model 3 or 4) running *operating system*
-               version 4.
+         `xm-sunos4.h'
+               for Suns (model 2, 3 or 4) running *operating system*
+               version 4.  (Use `xm-m68k.h' or `xm-sparc.h' for
+               version 3.)
 
-         `config-hp9k3.h'
+         `xm-sun386i.h'
+               for Sun roadrunner running any version of the
+               operating system.
+
+         `xm-hp9k320.h'
                for the HP 9000 series 300.
 
-         `config-gnx.h'
+         `xm-gnx.h'
                for the ns32000 running Genix
 
           If your system does not support symbolic links, you might
@@ -970,11 +1012,21 @@ Here is the procedure for installing GNU CC on a Unix system.
          `tm-sun2.h'
                for Sun 2 machines.
 
+         `tm-sun4os3.h'
+               for Sun 4 machines using operating system version 3.
+
+         `tm-sparc.h'
+               for Sun 4 machines using operating system version 4.
+
+         `tm-sun386i.h'
+               for Sun 386 machines.
+
          `tm-3b1.h'
                for AT&T 3b1 (aka 7300 Unix PC).
 
          `tm-isi68.h'
-               for Integrated Solutions systems.
+               for Integrated Solutions systems.  This file assumes
+               you use the GNU assembler.
 
          `tm-news800.h'
                for SONY News systems.
@@ -993,8 +1045,6 @@ Here is the procedure for installing GNU CC on a Unix system.
           For the vax, use `tm-vax.h' on BSD Unix, `tm-vaxv.h' on
           system V, or `tm-vms.h' on VMS.
 
-          For the SPARC (Sun 4), use `tm-sparc.h'.
-
           For the Motorola 88000, use `tm-m88k.h'.  The support for
           the 88000 has a few unfinished spots because there was no
           way to run the output.  Bugs are suspected in handling of
@@ -1003,7 +1053,7 @@ Here is the procedure for installing GNU CC on a Unix system.
           For the 80386, don't use `tm-i386.h' directly.  Use
           `tm-i386v.h' if the target machine is running system V,
           `tm-seq386.h' for a Sequent 386 system, or `tm-compaq.h'
-          for a Compaq.
+          for a Compaq, or `tm-sun386i.h' for a Sun 386 system.
 
           For the 32000, use `tm-sequent.h' if you are using a
           Sequent machine, or `tm-encore.h' for an Encore machine, or
@@ -1017,7 +1067,9 @@ Here is the procedure for installing GNU CC on a Unix system.
           Note that Encore systems are supported only under BSD.
 
         * Make a symbolic link named `md' to the machine description
-          pattern file (its name should be `MACHINE.md').
+          pattern file.  Its name should be `MACHINE.md', but MACHINE
+          is often not the same as the name used in the `tm.h' file
+          because the `md' files are more general.
 
         * Make a symbolic link named `aux-output.c' to the output
           subroutine file for your machine (its name should be
@@ -1028,9 +1080,8 @@ Here is the procedure for installing GNU CC on a Unix system.
      `cexp.c' are more recent than `c-parse.y' and `cexp.y' and you
      do not plan to change the `.y' files.)
 
-     Note that if you have an old version of Bison you may get an
-     error from the line with the `%expect' directive.  If so, simply
-     remove that line from `c-parse.y' and proceed.
+     Bison versions older that Sept 8, 1988 will produce incorrect
+     output for `c-parse.tab.c'.
 
   5. If you are using a Sun, make sure the environment variable
      `FLOAT_OPTION' is not set.  If this option were set to `f68881'
@@ -1039,6 +1090,12 @@ Here is the procedure for installing GNU CC on a Unix system.
      without special pains.
 
   6. Build the compiler.  Just type `make' in the compiler directory.
+
+     Ignore any warnings you may see about ``statement not reached''
+     in the `insn-emit.c'; they are normal.  Any other compilation
+     errors may represent bugs in the port to your machine or
+     operating system, and should be investigated and reported (*note
+     Bugs::.).
 
   7. Move the first-stage object files and executables into a
      subdirectory with this command:
@@ -1063,7 +1120,7 @@ Here is the procedure for installing GNU CC on a Unix system.
      more time, do this:
 
           make stage2
-          Make CC=stage2/gcc CFLAGS="-g -O -Bstage2/"
+          make CC=stage2/gcc CFLAGS="-g -O -Bstage2/"
           foreach file (*.o)
           cmp $file stage2/$file
           end
@@ -1111,10 +1168,10 @@ Here is the procedure for installing GNU CC on a Unix system.
      correct the include files by running the shell script
      `fixincludes'.  This installs modified, corrected copies of the
      files `ioctl.h', `ttychars.h' and many others, in a special
-     directory where only GNU CC will normally look for them.
-
-     See the file `fixincludes' for a list of all the files we know
-     to require correction.
+     directory where only GNU CC will normally look for them.  This
+     script will work on various systems because it choose the files
+     by searching all the system headers for the problem cases that
+     we know about.
 
 If you cannot install the compiler's passes and run-time support in
 `/usr/local/lib', you can alternatively use the `-B' option to
@@ -1128,7 +1185,7 @@ files by setting the Make variable `libdir' when you make GNU CC.
 
 
 
-File: internals,  Node: VMS Install,  Prev: Installation,  Up: Installation
+File: gcc.info,  Node: VMS Install,  Prev: Installation,  Up: Installation
 
 Installing GNU CC on VMS
 ========================
@@ -1147,9 +1204,8 @@ no compilation is necessary unless you change the sources.  (This is
 a good thing, since you probably don't have any other C compiler.) 
 If you must recompile, here is how:
 
-  1. Copy the file `tm-vms.h' to `tm.h', `config-vms.h' to
-     `config.h', `vax.md' to `md.' and `output-vax.c' to
-     `aux-output.c'.
+  1. Copy the file `tm-vms.h' to `tm.h', `xm-vms.h' to `config.h',
+     `vax.md' to `md.' and `output-vax.c' to `aux-output.c'.
 
   2. Type `@make' to do recompile everything.
 
@@ -1176,35 +1232,5 @@ VMS CLD file for GNU CC as follows:
      Now you can invoke the compiler with a command like `gcc
      /verbose file.c', which is equivalent to the command `gcc -v -c
      file.c' in Unix.
-
-
-
-File: internals,  Node: Trouble,  Next: Incompatibilities,  Prev: Installation,  Up: Top
-
-Trouble in Installation
-***********************
-
-Here are some of the things that have caused trouble for people
-installing GNU CC.
-
-   * On certain systems, defining certain environment variables such
-     as `CC' can interfere with the functioning of `make'.
-
-   * Cross compilation can run into trouble for certain machines
-     because some target machines' assemblers require floating point
-     numbers to be written as *integer* constants in certain contexts.
-
-     The compiler writes these integer constants by examining the
-     floating point value as an integer and printing that integer,
-     because this is simple to write and independent of the details
-     of the floating point representation.  But this does not work if
-     the compiler is running on a different machine with an
-     incompatible floating point format, or even a different
-     byte-ordering.
-
-     It is possible to fix this by writing machine-independent code
-     which understands the floating point representation of the
-     target machine.  I am not interested in doing that much work to
-     compensate for bugs in assemblers.
 
 
